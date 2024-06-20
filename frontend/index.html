@@ -10,6 +10,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Arial:wght@400;700&family=Verdana:wght@400;700&display=swap"
     />
+    <script async src="https://docs.opencv.org/master/opencv.js"></script>
 
     <style>
       body {
@@ -92,6 +93,8 @@
     </select>
     <input type="range" id="gapSizeSlider" min="0" max="30" value="5" />
     <label for="gapSizeSlider">Spacing: <span id="gapSizeLabel">5</span></label>
+    <input type="file" id="imageInput" accept="image/*" aria-label="Upload an image for chart generation" />
+    <button onclick="processImage()">Process Image</button>
     <!-- <button onclick="generateChart()">Generate Chart</button> -->
     <div id="chart" class="loading">Start typing...</div>
     <div id="exportButtons">
@@ -458,6 +461,62 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link); // Remove the link once clicked
+      }
+
+      function processImage() {
+        const fileInput = document.getElementById("imageInput");
+        const file = fileInput.files[0];
+        if (!file) {
+          alert("Please upload an image file.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const imgElement = document.createElement("img");
+          imgElement.src = e.target.result;
+          imgElement.onload = function () {
+            const srcMat = cv.imread(imgElement);
+            let dstMat = new cv.Mat();
+
+            // Convert the image to grayscale
+            cv.cvtColor(srcMat, dstMat, cv.COLOR_RGBA2GRAY, 0);
+
+            // Apply Gaussian Blur
+            let ksize = new cv.Size(15, 15);
+            cv.GaussianBlur(dstMat, dstMat, ksize, 0, 0, cv.BORDER_DEFAULT);
+
+            // Apply adaptive thresholding
+            cv.adaptiveThreshold(dstMat, dstMat, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 2);
+
+            // Apply dilation to merge edges into blobs
+            const M = cv.Mat.ones(20, 20, cv.CV_8U);
+            const anchor = new cv.Point(-1, -1);
+            cv.dilate(dstMat, dstMat, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+
+            // Reduce resolution
+            cv.resize(dstMat, dstMat, new cv.Size(200, 100), 0, 0, cv.INTER_AREA);
+
+            // Flip black and white pixels
+            cv.bitwise_not(dstMat, dstMat);
+
+            const canvas = document.createElement("canvas");
+            cv.imshow(canvas, dstMat);
+
+            // // Display the image
+            // document.body.appendChild(canvas);
+
+            // Generate candlestick data from the edge image
+            const chartDataFlat = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+            const chartData = extractCandlestickDataFromImageData(chartDataFlat, 0);
+            renderChart(chartData);
+
+            // Clean up
+            srcMat.delete();
+            dstMat.delete();
+          };
+        };
+        reader.readAsDataURL(file);
       }
     </script>
   </body>
