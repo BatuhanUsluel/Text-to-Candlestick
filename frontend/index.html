@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Candlestick Chart Generator</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Arial:wght@400;700&family=Verdana:wght@400;700&display=swap"
+    />
+
+    <style>
+      body {
+        font-family: "Roboto", sans-serif;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 20px;
+      }
+      h1 {
+        margin-bottom: 20px;
+      }
+      #chart {
+        width: 100%;
+        max-width: 900px;
+        height: 400px;
+        margin-top: 20px;
+      }
+      input,
+      button {
+        padding: 10px;
+        margin: 10px 0;
+        width: 90%;
+        max-width: 300px;
+        box-sizing: border-box;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      button {
+        cursor: pointer;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .loading,
+      .error {
+        text-align: center;
+        font-size: 18px;
+        color: #888;
+      }
+      .error {
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Candlestick Chart Generator</h1>
+    <input type="text" id="textInput" placeholder="Enter text to draw" value="Hello" aria-label="Enter text for chart generation" />
+    <label for="fontSelect">Select font:</label>
+    <select id="fontSelect" aria-label="Select font">
+      <option value="https://raw.githubusercontent.com/matomo-org/travis-scripts/master/fonts/Verdana.ttf">Verdana</option>
+      <option value="https://raw.githubusercontent.com/google/fonts/main/apache/arimo/Arimo%5Bwght%5D.ttf">Arimo</option>
+      <option
+        value="https://raw.githubusercontent.com/google/fonts/main/apache/robotomono/RobotoMono%5Bwght%5D.ttf
+      "
+      >
+        Robotomono
+      </option>
+    </select>
+    <input type="range" id="gapSizeSlider" min="0" max="30" value="5" />
+    <label for="gapSizeSlider">Spacing: <span id="gapSizeLabel">5</span></label>
+    <!-- <button onclick="generateChart()">Generate Chart</button> -->
+    <div id="chart" class="loading">Start typing...</div>
+
+    <script>
+      let font;
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      loadFont("https://raw.githubusercontent.com/matomo-org/travis-scripts/master/fonts/Verdana.ttf");
+
+      document.addEventListener("DOMContentLoaded", function () {
+        document.getElementById("textInput").focus(); // Focus the text input by default
+        generateChart(); // Generate the chart with default text "Hello"
+      });
+      document.getElementById("textInput").addEventListener("input", function () {
+        generateChart(); // Regenerate the chart on text change
+      });
+
+      document.getElementById("gapSizeSlider").addEventListener("input", function () {
+        document.getElementById("gapSizeLabel").textContent = this.value;
+        if (document.getElementById("textInput").value.trim()) {
+          generateChart(); // Regenerate the chart on slider change if there's text
+        }
+      });
+
+      document.getElementById("fontSelect").addEventListener("change", function () {
+        const fontUrl = this.value;
+        loadFont(fontUrl);
+      });
+
+      function loadFont(url) {
+        opentype.load(url, function (err, loadedFont) {
+          if (err) {
+            alert("Font could not be loaded: " + err);
+          } else {
+            font = loadedFont;
+            console.log("Loaded font from URL:", url);
+            if (document.getElementById("textInput").value.trim()) {
+              generateChart(); // Regenerate the chart with the new font if there's text
+            }
+          }
+        });
+      }
+
+      function generateChart() {
+        const text = document.getElementById("textInput").value.trim();
+        const gapSize = parseInt(document.getElementById("gapSizeSlider").value, 10);
+
+        // if (!text) {
+        //   alert("Please enter some text.");
+        //   return;
+        // }
+        const data = generateDataFromText(text, gapSize);
+        console.log("Generated data:", data);
+        renderChart(data);
+      }
+
+      function generateDataFromText(text, gapSize) {
+        const data = [];
+        let offsetX = 0;
+
+        text.split("").forEach((char) => {
+          console.log("Processing character:", char);
+          if (char === " ") {
+            for (let i = 0; i < 10 + gapSize / 2; i++) {
+              data.push({
+                time: offsetX + i,
+                open: 0.5,
+                high: 0.5,
+                low: 0.5,
+                close: 0.5,
+              });
+            }
+            offsetX += 10 + gapSize / 2;
+            return;
+          }
+          const path = font.getPath(char, 0, 0, 40);
+          //   const bbox = path.getBoundingBox();
+          //   const width = bbox.x2 - bbox.x1 + 20; // Add padding
+          //   const height = bbox.y2 - bbox.y1 + 20; // Add padding
+
+          canvas.width = 70; // Add horizontal padding
+          canvas.height = 70; // Add vertical padding for descenders and ascenders
+
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+          ctx.fillStyle = "white"; // Background color
+          ctx.fillRect(0, 0, canvas.width, canvas.height); // Fill background
+
+          ctx.fillStyle = "black"; // Text color
+          ctx.translate(15, 35); // Move the starting point for text drawing
+          path.draw(ctx);
+
+          // Append copy of canvas to document body for debugging
+          //   const copyCanvas = canvas.cloneNode(true);
+          //   document.body.appendChild(copyCanvas);
+
+          const imageData = ctx.getImageData(0, 0, 70, 70);
+          const { minColumn, maxColumn } = findNonEmptyColumns(imageData);
+
+          let croppedImageData;
+          const croppedCanvas = cropCanvas(canvas, minColumn, maxColumn);
+          croppedImageData = croppedCanvas.getContext("2d").getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
+
+          //   const copyCanvas = cloneCanvasWithContent(croppedCanvas);
+          //   document.body.appendChild(copyCanvas);
+
+          console.log("Cropped Image data:", croppedImageData);
+          const candlestickData = extractCandlestickDataFromImageData(croppedImageData, offsetX);
+          data.push(...candlestickData);
+          // Insert gap after each character
+          //   const gapSize = 50; // Number of empty data points between characters
+          for (let i = 0; i < gapSize; i++) {
+            data.push({
+              time: offsetX + croppedImageData.width + i,
+              open: 0.5,
+              high: 0.5,
+              low: 0.5,
+              close: 0.5,
+            });
+          }
+          offsetX += croppedImageData.width + gapSize;
+        });
+
+        return data;
+      }
+
+      function cloneCanvasWithContent(originalCanvas) {
+        // Clone the original canvas structure
+        const clonedCanvas = originalCanvas.cloneNode(true);
+
+        // Get the drawing contexts
+        const originalCtx = originalCanvas.getContext("2d");
+        const clonedCtx = clonedCanvas.getContext("2d");
+
+        // Set the width and height for the cloned canvas (important if not copied over)
+        clonedCanvas.width = originalCanvas.width;
+        clonedCanvas.height = originalCanvas.height;
+
+        // Copy the image data from the original canvas to the cloned canvas
+        const imageData = originalCtx.getImageData(0, 0, originalCanvas.width, originalCanvas.height);
+        clonedCtx.putImageData(imageData, 0, 0);
+
+        return clonedCanvas;
+      }
+
+      function findNonEmptyColumns(imageData) {
+        const width = imageData.width;
+        const height = imageData.height;
+        const pixels = imageData.data;
+        const threshold = 128; // Pixel intensity threshold for dark pixels
+        let minColumn = width;
+        let maxColumn = 0;
+
+        for (let x = 0; x < width; x++) {
+          for (let y = 0; y < height; y++) {
+            let i = (y * width + x) * 4; // Index for the red channel
+            // Check if the pixel is dark
+            if (pixels[i] < threshold || pixels[i + 1] < threshold || pixels[i + 2] < threshold) {
+              minColumn = Math.min(minColumn, x);
+              maxColumn = Math.max(maxColumn, x);
+              break; // Once a dark pixel is found in a column, no need to check more pixels in this column
+            }
+          }
+        }
+
+        return { minColumn, maxColumn };
+      }
+
+      function cropCanvas(canvas, minColumn, maxColumn) {
+        const ctx = canvas.getContext("2d");
+        const width = maxColumn - minColumn + 1;
+        const imageData = ctx.getImageData(minColumn, 0, width, canvas.height);
+
+        // Create a new canvas to draw the cropped image
+        const croppedCanvas = document.createElement("canvas");
+        croppedCanvas.width = width;
+        croppedCanvas.height = canvas.height;
+        const croppedCtx = croppedCanvas.getContext("2d");
+        croppedCtx.putImageData(imageData, 0, 0);
+
+        return croppedCanvas;
+      }
+
+      function extractCandlestickDataFromImageData(imageData, offsetX) {
+        const data = [];
+        const { width, height } = imageData;
+        const pixels = imageData.data;
+
+        function isBlack(pixelIndex) {
+          return pixels[pixelIndex * 4] === 0 && pixels[pixelIndex * 4 + 1] === 0 && pixels[pixelIndex * 4 + 2] === 0;
+        }
+
+        for (let x = 0; x < width; x++) {
+          const blackPixels = [];
+          for (let y = 0; y < height; y++) {
+            if (isBlack(y * width + x)) {
+              blackPixels.push(y);
+            }
+          }
+
+          if (blackPixels.length > 0) {
+            const segments = [];
+            let currentSegment = [blackPixels[0]];
+
+            for (let i = 1; i < blackPixels.length; i++) {
+              if (blackPixels[i] === blackPixels[i - 1] + 1) {
+                currentSegment.push(blackPixels[i]);
+              } else {
+                segments.push(currentSegment);
+                currentSegment = [blackPixels[i]];
+              }
+            }
+            segments.push(currentSegment); // Push the last segment
+
+            let open, close;
+            const high = Math.min(...blackPixels) / height;
+            const low = Math.max(...blackPixels) / height;
+
+            if (segments.length === 3) {
+              const middleSegment = segments[1];
+              close = middleSegment[0] / height;
+              open = middleSegment[middleSegment.length - 1] / height;
+            } else {
+              const longestSegment = segments.reduce((a, b) => (a.length > b.length ? a : b));
+              close = longestSegment[0] / height;
+              open = longestSegment[longestSegment.length - 1] / height;
+            }
+
+            data.push({
+              time: offsetX + x,
+              open: 1 - open,
+              high: 1 - high,
+              low: 1 - low,
+              close: 1 - close,
+            });
+          } else {
+            // Neutral values for columns with no black pixels
+            data.push({
+              time: offsetX + x,
+              open: 0.5,
+              high: 0.5,
+              low: 0.5,
+              close: 0.5,
+            });
+          }
+        }
+
+        console.log("Candlestick data for column:", data);
+        return data;
+      }
+
+      function renderChart(data) {
+        const chartContainer = document.getElementById("chart");
+        chartContainer.innerHTML = "";
+
+        const chart = LightweightCharts.createChart(chartContainer, {
+          width: chartContainer.clientWidth,
+          height: 400,
+        });
+
+        const candlestickSeries = chart.addCandlestickSeries();
+        candlestickSeries.setData(data);
+      }
+    </script>
+  </body>
+</html>
